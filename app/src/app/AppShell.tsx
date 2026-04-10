@@ -19,8 +19,31 @@ export function AppShell() {
         zIndex: 10,
         boxShadow: 'var(--shadow-md)'
       }}>
-        <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Link to="/" style={{ color: 'white', fontWeight: 'bold', fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div
+          className="container"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+            padding: '0 1rem'
+          }}
+        >
+          <Link
+            to="/"
+            style={{
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: 'clamp(1rem, 4vw, 1.25rem)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              minWidth: 0,
+              flex: '1 1 auto',
+              justifyContent: 'flex-end',
+              whiteSpace: 'nowrap'
+            }}
+          >
             <span style={{ color: 'var(--color-outline)' }}>⚡</span>
             Traklin Mobile
           </Link>

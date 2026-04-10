@@ -50,6 +50,32 @@ export type ProductCardModel = {
   snapshotAt?: number;
 };
 
+export type ProductDetailSectionId =
+  | 'description'
+  | 'technical_spec'
+  | 'warranty'
+  | 'important_info';
+
+export type ProductDetailSection = {
+  id: ProductDetailSectionId;
+  title: string;
+  html: string;
+};
+
+export type ProductDetailModel = {
+  sourceUrl: string;
+  resolvedProductId: string | null;
+  title: string;
+  brandName: string | null;
+  importerName: string | null;
+  sku: string | null;
+  imageUrl: string | null;
+  galleryImages: string[];
+  shortDescription: string | null;
+  sections: ProductDetailSection[];
+  fetchedAt: number;
+};
+
 export type ProductResultsPage = {
   currentPage: number;
   hasMore: boolean;
@@ -69,12 +95,33 @@ export type CartState = {
   items: CartItem[];
 };
 
-export type AvailabilityStatus = 'unknown' | 'placeholder';
+export type AvailabilityStatus = 'available' | 'unavailable' | 'unknown';
 
-export type StoreAvailabilityPlaceholder = {
-  status: AvailabilityStatus;
-  preferredStoreLabel: string;
-  message: string;
+export type BranchCatalogEntry = {
+  id: number;
+  name: string;
+  city: string;
+  showOnMap: boolean;
+  lat?: number;
+  lng?: number;
+};
+
+export type ProductBranchAvailability = {
+  branchId: number;
+  branchName: string;
+  pickupImmediate: AvailabilityStatus;
+  displayAvailable: AvailabilityStatus;
+  pickupOrderable: AvailabilityStatus;
+};
+
+export type ProductAvailabilityResponse = {
+  productId: string;
+  branches: ProductBranchAvailability[];
+};
+
+export type PreferredBranchState = {
+  preferredBranchId: number;
+  updatedAt: number;
 };
 
 export type ProductRouteState = {

@@ -1,17 +1,13 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, MapPinned, Minus, PackageCheck, Plus, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ExternalLink, FileText, Minus, PackageSearch, Plus, ShieldCheck, ShoppingCart } from 'lucide-react';
 import { getProductSnapshot, saveProductSnapshot } from '../../lib/traklin/productCache';
 import { getCategoryBySlug } from '../../lib/traklin/config';
-import { toAbsoluteProductUrl } from '../../lib/traklin/api';
+import { fetchProductDetail, toAbsoluteProductUrl } from '../../lib/traklin/api';
 import { useCart } from '../cart/CartContext';
-import type { ProductCardModel, ProductRouteState, StoreAvailabilityPlaceholder } from '../../lib/traklin/types';
-
-const availabilityPlaceholder: StoreAvailabilityPlaceholder = {
-  status: 'placeholder',
-  preferredStoreLabel: 'סניף מועדף',
-  message: 'חיווי מלאי ומפת סניפים יחוברו בשלב הבא.'
-};
+import type { ProductCardModel, ProductDetailSection, ProductRouteState } from '../../lib/traklin/types';
+import { ProductAvailabilitySection } from './ProductAvailabilitySection';
 
 export function ProductDetailPage() {
   const { productId = '' } = useParams<{ productId: string }>();
@@ -30,12 +26,103 @@ export function ProductDetailPage() {
 
   const category = getCategoryBySlug(routeState.categorySlug || product?.categorySlug || '');
   const quantity = getItemQuantity(productId);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [resolvedProductId, setResolvedProductId] = useState<string | null>(null);
+  const [detailTitle, setDetailTitle] = useState<string | null>(null);
+  const [detailBrandName, setDetailBrandName] = useState<string | null>(null);
+  const [importerName, setImporterName] = useState<string | null>(null);
+  const [sku, setSku] = useState<string | null>(null);
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [detailSections, setDetailSections] = useState<ProductDetailSection[]>([]);
+  const [shortDescription, setShortDescription] = useState<string | null>(null);
+  const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({
+    description: true,
+    technical_spec: false,
+    warranty: false,
+    important_info: false
+  });
 
   useEffect(() => {
     if (product) {
       saveProductSnapshot(product);
     }
   }, [product]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadProductDetail() {
+      if (!product?.href) {
+        setResolvedProductId(null);
+        setDetailTitle(null);
+        setDetailBrandName(null);
+        setImporterName(null);
+        setSku(null);
+        setGalleryImages(product?.imageUrl ? [product.imageUrl] : []);
+        setSelectedImageUrl(product?.imageUrl ?? null);
+        setDetailSections([]);
+        setShortDescription(null);
+        setDetailError(null);
+        return;
+      }
+
+      try {
+        setDetailLoading(true);
+        setDetailError(null);
+        const detail = await fetchProductDetail(product.href);
+
+        if (isCancelled) {
+          return;
+        }
+
+        setResolvedProductId(detail.resolvedProductId);
+        setDetailTitle(detail.title);
+        setDetailBrandName(detail.brandName);
+        setImporterName(detail.importerName);
+        setSku(detail.sku);
+        setGalleryImages(detail.galleryImages);
+        setSelectedImageUrl(detail.imageUrl || detail.galleryImages[0] || product.imageUrl || null);
+        setDetailSections(detail.sections);
+        setShortDescription(detail.shortDescription);
+      } catch {
+        if (isCancelled) {
+          return;
+        }
+
+        setResolvedProductId(null);
+        setDetailTitle(null);
+        setDetailBrandName(null);
+        setImporterName(null);
+        setSku(null);
+        setGalleryImages(product.imageUrl ? [product.imageUrl] : []);
+        setSelectedImageUrl(product.imageUrl ?? null);
+        setDetailSections([]);
+        setShortDescription(null);
+        setDetailError('לא הצלחנו לטעון את פרטי המוצר המלאים כרגע.');
+      } finally {
+        if (!isCancelled) {
+          setDetailLoading(false);
+        }
+      }
+    }
+
+    void loadProductDetail();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [product]);
+
+  useEffect(() => {
+    setOpenPanels({
+      description: true,
+      technical_spec: false,
+      warranty: false,
+      important_info: false
+    });
+  }, [productId]);
 
   if (!product) {
     return (
@@ -65,6 +152,10 @@ export function ProductDetailPage() {
   }
 
   const absoluteUrl = toAbsoluteProductUrl(product.href);
+  const displayTitle = detailTitle || product.title;
+  const displayBrandName = detailBrandName || product.brandName || null;
+  const displayImageUrl = selectedImageUrl || galleryImages[0] || product.imageUrl || null;
+  const availabilityProductId = resolvedProductId || product.id;
 
   return (
     <div className="container" style={{ padding: '1.25rem 1rem 3rem' }}>
@@ -83,8 +174,8 @@ export function ProductDetailPage() {
         <section className="detail-card">
           <div className="detail-hero">
             <div className="detail-image-panel">
-              {product.imageUrl ? (
-                <img src={product.imageUrl} alt={product.title} className="detail-image" />
+              {displayImageUrl ? (
+                <img src={displayImageUrl} alt={displayTitle} className="detail-image" />
               ) : (
                 <div style={{ color: 'var(--color-text-light)' }}>ללא תמונה</div>
               )}
@@ -92,13 +183,51 @@ export function ProductDetailPage() {
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                {product.brandName && (
-                  <div className="detail-eyebrow">{product.brandName}</div>
+                {displayBrandName && (
+                  <div className="detail-eyebrow">{displayBrandName}</div>
                 )}
                 <h1 style={{ fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', lineHeight: 1.2, marginTop: '0.35rem' }}>
-                  {product.title}
+                  {displayTitle}
                 </h1>
               </div>
+
+              {(importerName || sku || resolvedProductId) && (
+                <div className="detail-meta-grid">
+                  {importerName && (
+                    <div className="detail-meta-card">
+                      <span className="detail-meta-label">יבואן</span>
+                      <strong>{importerName}</strong>
+                    </div>
+                  )}
+                  {sku && (
+                    <div className="detail-meta-card">
+                      <span className="detail-meta-label">מק"ט</span>
+                      <strong>{sku}</strong>
+                    </div>
+                  )}
+                  {resolvedProductId && (
+                    <div className="detail-meta-card">
+                      <span className="detail-meta-label">מזהה מוצר</span>
+                      <strong>{resolvedProductId}</strong>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {galleryImages.length > 1 && (
+                <div className="detail-gallery-strip" aria-label="גלריית תמונות מוצר">
+                  {galleryImages.map(imageUrl => (
+                    <button
+                      key={imageUrl}
+                      type="button"
+                      className={`detail-gallery-thumb ${imageUrl === displayImageUrl ? 'is-active' : ''}`}
+                      onClick={() => setSelectedImageUrl(imageUrl)}
+                    >
+                      <img src={imageUrl} alt={displayTitle} />
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {product.badges.length > 0 && (
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -119,10 +248,10 @@ export function ProductDetailPage() {
                     ? `${product.currentPrice.toLocaleString()} ${product.currencySign ?? '₪'}`
                     : 'מחיר לא זמין'}
                 </div>
-                <div className="price-note">התצוגה נשענת על נתוני רשימת המוצרים השמורים באפליקציה.</div>
+                <div className="price-note">המחיר מוצג מתוך נתוני רשימת המוצרים, לצד תוכן מפורט שנשלף מדף המוצר.</div>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className="detail-actions">
                 {quantity > 0 ? (
                   <div className="quantity-pill large">
                     <button onClick={() => decrementItem(product.id)} aria-label="Decrease quantity">
@@ -148,47 +277,105 @@ export function ProductDetailPage() {
           </div>
         </section>
 
-        <section className="detail-grid">
-          <div className="detail-card">
-            <div className="section-heading">
-              <PackageCheck size={18} />
-              <h2>זמינות בסניף</h2>
+        {detailLoading ? (
+          <section className="detail-card">
+            <div className="availability-state">
+              <div className="spinner" />
+              <span>טוענים תוכן מפורט מדף המוצר...</span>
             </div>
-            <div className="availability-card">
-              <div className="availability-row">
-                <span className="availability-label">סניף נבחר</span>
-                <strong>{availabilityPlaceholder.preferredStoreLabel}</strong>
-              </div>
-              <div className="availability-row">
-                <span className="availability-label">סטטוס</span>
-                <span className="availability-tag">Placeholder</span>
-              </div>
-              <p style={{ color: 'var(--color-text-light)', lineHeight: 1.6 }}>
-                {availabilityPlaceholder.message}
-              </p>
+          </section>
+        ) : detailError ? (
+          <section className="detail-card">
+            <div className="availability-state error">
+              <span>{detailError}</span>
             </div>
-          </div>
+          </section>
+        ) : (
+          <>
+            {shortDescription && (
+              <section className="detail-card">
+                <button
+                  type="button"
+                  className={`detail-section-toggle ${openPanels.description ? 'is-open' : ''}`}
+                  onClick={() => togglePanel('description', setOpenPanels)}
+                  aria-expanded={openPanels.description}
+                >
+                  <span className="section-heading">
+                    <FileText size={18} />
+                    <h2>תיאור מוצר</h2>
+                  </span>
+                  <ChevronDown size={18} />
+                </button>
+                {openPanels.description && (
+                  <div
+                    className="detail-rich-text"
+                    dangerouslySetInnerHTML={{ __html: ensureParagraphs(shortDescription) }}
+                  />
+                )}
+              </section>
+            )}
 
-          <div className="detail-card">
-            <div className="section-heading">
-              <MapPinned size={18} />
-              <h2>מפת זמינות</h2>
-            </div>
-            <div className="map-placeholder">
-              <div className="map-grid" />
-              <div className="map-content">
-                <strong>Map placeholder</strong>
-                <span>כאן תוצג מפת הסניפים והזמינות של המוצר.</span>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                  <span className="map-legend neutral">Unknown</span>
-                  <span className="map-legend muted">Unavailable</span>
-                  <span className="map-legend accent">Available</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+            {detailSections
+              .filter(section => section.id !== 'description' || !shortDescription)
+              .map(section => (
+                <section key={section.id} className="detail-card">
+                  <button
+                    type="button"
+                    className={`detail-section-toggle ${openPanels[section.id] ? 'is-open' : ''}`}
+                    onClick={() => togglePanel(section.id, setOpenPanels)}
+                    aria-expanded={!!openPanels[section.id]}
+                  >
+                    <span className="section-heading">
+                      {getSectionIcon(section.id)}
+                      <h2>{section.title}</h2>
+                    </span>
+                    <ChevronDown size={18} />
+                  </button>
+                  {openPanels[section.id] && (
+                    <div
+                      className="detail-rich-text"
+                      dangerouslySetInnerHTML={{ __html: section.html }}
+                    />
+                  )}
+                </section>
+              ))}
+          </>
+        )}
+
+        <ProductAvailabilitySection productId={availabilityProductId} />
       </div>
     </div>
   );
+}
+
+function getSectionIcon(sectionId: ProductDetailSection['id']) {
+  switch (sectionId) {
+    case 'technical_spec':
+      return <PackageSearch size={18} />;
+    case 'warranty':
+      return <ShieldCheck size={18} />;
+    case 'important_info':
+      return <ExternalLink size={18} />;
+    default:
+      return <FileText size={18} />;
+  }
+}
+
+function ensureParagraphs(text: string) {
+  return text
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => `<p>${line}</p>`)
+    .join('');
+}
+
+function togglePanel(
+  panelId: string,
+  setOpenPanels: Dispatch<SetStateAction<Record<string, boolean>>>
+) {
+  setOpenPanels(prev => ({
+    ...prev,
+    [panelId]: !prev[panelId]
+  }));
 }

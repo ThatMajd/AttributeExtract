@@ -64,7 +64,6 @@ export function ProductCard({
         </h3>
 
         <div className="product-meta-row">
-          <span className="availability-caption">בדיקת מלאי בסניף: בהמשך</span>
           <span className="subtle-link">
             פרטים נוספים
             <ExternalLink size={14} />

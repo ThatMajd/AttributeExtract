@@ -7,6 +7,7 @@ import { Home } from './features/categories/Home'
 import { CategoryPage } from './features/products/CategoryPage'
 import { ProductDetailPage } from './features/products/ProductDetailPage'
 import './index.css'
+import 'leaflet/dist/leaflet.css'
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
